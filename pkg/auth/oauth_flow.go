@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dynatrace-oss/dtctl/pkg/config"
@@ -405,6 +406,7 @@ type OAuthFlow struct {
 	state          string
 	server         *http.Server
 	resultChan     chan *authResult
+	resultOnce     sync.Once
 }
 
 type authResult struct {
@@ -574,7 +576,7 @@ func (f *OAuthFlow) startCallbackServer() error {
 		
 		// Start serving
 		if err := f.server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			f.resultChan <- &authResult{err: fmt.Errorf("callback server error: %w", err)}
+			f.publishResult(&authResult{err: fmt.Errorf("callback server error: %w", err)})
 		}
 	}()
 	
@@ -621,7 +623,7 @@ func (f *OAuthFlow) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	f.sendSuccess(w)
-	f.resultChan <- &authResult{tokens: tokens}
+	f.publishResult(&authResult{tokens: tokens})
 }
 
 func (f *OAuthFlow) exchangeCode(code string) (*TokenSet, error) {
@@ -673,7 +675,16 @@ func (f *OAuthFlow) sendError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusBadRequest)
 	htmlContent := strings.ReplaceAll(errorHTML, "{{ERROR}}", html.EscapeString(err.Error()))
 	w.Write([]byte(htmlContent))
-	f.resultChan <- &authResult{err: err}
+	f.publishResult(&authResult{err: err})
+}
+
+func (f *OAuthFlow) publishResult(result *authResult) {
+	f.resultOnce.Do(func() {
+		select {
+		case f.resultChan <- result:
+		default:
+		}
+	})
 }
 
 func generatePKCE() (verifier, challenge string, err error) {
