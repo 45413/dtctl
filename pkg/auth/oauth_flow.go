@@ -556,7 +556,7 @@ func (f *OAuthFlow) startCallbackServer() error {
 	mux.HandleFunc(callbackPath, f.handleCallback)
 	
 	// Create a listener first so we can verify it's bound before proceeding
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", f.config.Port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", f.config.Port))
 	if err != nil {
 		return fmt.Errorf("failed to bind to port %d: %w", f.config.Port, err)
 	}
