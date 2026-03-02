@@ -234,8 +234,12 @@ func (tm *TokenManager) GetTokenInfo(tokenName string) (*StoredToken, error) {
 
 // IsTokenExpired checks if a token is expired
 func IsTokenExpired(tokens *TokenSet) bool {
+	if tokens == nil {
+		return true
+	}
+
 	if tokens.ExpiresAt.IsZero() {
-		return false // Can't determine, assume not expired
+		return true
 	}
 	return time.Now().After(tokens.ExpiresAt)
 }

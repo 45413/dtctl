@@ -296,7 +296,7 @@ func TestIsTokenExpired(t *testing.T) {
 		{
 			name:      "Zero time (no expiry set)",
 			expiresAt: time.Time{},
-			want:      false,
+			want:      true,
 		},
 	}
 	
@@ -314,6 +314,12 @@ func TestIsTokenExpired(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Nil token", func(t *testing.T) {
+		if got := IsTokenExpired(nil); !got {
+			t.Errorf("IsTokenExpired(nil) = %v, want true", got)
+		}
+	})
 }
 
 // TestTokenManager_needsRefresh tests token refresh logic
