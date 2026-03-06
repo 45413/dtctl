@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dynatrace-oss/dtctl/pkg/skills"
+	"github.com/dynatrace-oss/dtctl/pkg/suggest"
 )
 
 // skillsCmd is the parent command for AI assistant skill management.
@@ -29,7 +30,30 @@ Supported agents: claude, copilot, cursor, opencode.`,
 
   # Check what's installed
   dtctl skills status`,
-	RunE: requireSubcommand,
+	RunE: requireSkillsSubcommand,
+}
+
+// requireSkillsSubcommand returns a helpful error when no subcommand is given.
+// Unlike requireSubcommand (which says "resource type"), this uses wording
+// appropriate for a utility command whose subcommands are verbs.
+func requireSkillsSubcommand(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		var subs []string
+		for _, sub := range cmd.Commands() {
+			if sub.IsAvailableCommand() {
+				subs = append(subs, sub.Name())
+			}
+		}
+		return fmt.Errorf("requires a subcommand\n\nAvailable subcommands:\n  %s\n\nUsage:\n  %s <subcommand> [flags]",
+			strings.Join(subs, "\n  "), cmd.CommandPath())
+	}
+
+	subcommands := collectSubcommands(cmd)
+	if suggestion := suggest.FindClosest(args[0], subcommands); suggestion != nil {
+		return fmt.Errorf("unknown subcommand %q, did you mean %q?", args[0], suggestion.Value)
+	}
+
+	return fmt.Errorf("unknown subcommand %q\nRun '%s --help' for available subcommands", args[0], cmd.CommandPath())
 }
 
 // skillsInstallCmd installs skill files for an AI coding assistant.
@@ -189,7 +213,7 @@ func runSkillsInstall(cmd *cobra.Command, _ []string) error {
 	}
 
 	printer := NewPrinter()
-	if ap := enrichAgent(printer, "skills", "install"); ap != nil {
+	if ap := enrichAgent(printer, "install", "skills"); ap != nil {
 		ap.SetSuggestions([]string{
 			"Run 'dtctl skills status' to verify installation",
 		})
@@ -221,7 +245,7 @@ func runSkillsInstall(cmd *cobra.Command, _ []string) error {
 // runSkillsList lists all supported agents.
 func runSkillsList() error {
 	printer := NewPrinter()
-	if ap := enrichAgent(printer, "skills", "list"); ap != nil {
+	if ap := enrichAgent(printer, "list", "skills"); ap != nil {
 		ap.SetTotal(len(skills.AllAgents()))
 	}
 
@@ -269,7 +293,7 @@ func runSkillsUninstall(cmd *cobra.Command, _ []string) error {
 	}
 
 	printer := NewPrinter()
-	if ap := enrichAgent(printer, "skills", "uninstall"); ap != nil {
+	if ap := enrichAgent(printer, "uninstall", "skills"); ap != nil {
 		ap.SetSuggestions([]string{
 			"Run 'dtctl skills status' to verify removal",
 		})
@@ -303,11 +327,8 @@ func runSkillsStatus(cmd *cobra.Command, _ []string) error {
 
 	forFlag, _ := cmd.Flags().GetString("for")
 
-	// Detect agent once, pass into print helpers
-	detectedAgent, detected := skills.DetectAgent()
-
 	printer := NewPrinter()
-	ap := enrichAgent(printer, "skills", "status")
+	ap := enrichAgent(printer, "status", "skills")
 
 	if forFlag != "" {
 		agent, err := resolveAgent(forFlag)
@@ -319,6 +340,8 @@ func runSkillsStatus(cmd *cobra.Command, _ []string) error {
 		if agentMode {
 			return printer.Print(statusToAgentEntry(result))
 		}
+		// Detect agent only for human-readable "(detected via ...)" annotation
+		detectedAgent, detected := skills.DetectAgent()
 		printStatus(result, detectedAgent, detected)
 		return nil
 	}
@@ -337,6 +360,8 @@ func runSkillsStatus(cmd *cobra.Command, _ []string) error {
 		return printer.PrintList(entries)
 	}
 
+	// Detect agent only for human-readable "(detected via ...)" annotation
+	detectedAgent, detected := skills.DetectAgent()
 	anyInstalled := false
 	for _, r := range results {
 		if r.Installed {
