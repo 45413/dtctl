@@ -164,14 +164,75 @@ func (h *Handler) CreateBreakpoint(workspaceID, fileName string, lineNumber int)
 	return h.executeGraphQL(mutation, variables)
 }
 
+func (h *Handler) GetWorkspaceRules(workspaceID string) (map[string]interface{}, error) {
+	query := `query GetWorkspaceRules($orgId: ID!, $workspaceId: ID!) {
+	org(id: $orgId) {
+		id
+		workspace(id: $workspaceId) {
+			rules {
+				id
+				immutableId
+				template_id
+				template_type
+				selector
+				workspace
+				user_email
+				workspace_name
+				aug_json {
+					id
+					mutable_id
+					location {
+						name
+						filename
+						sourcePath
+						sourceRepo
+						lineno
+						sha256
+						includeExternals
+						pdbSha256
+						line_crc32_2
+						line_unique
+						role
+					}
+					action {
+						name
+						operations
+					}
+					rateLimit
+					conditional
+					originalCondition
+					globalHitLimit
+					globalDisableAfterTime
+				}
+				is_disabled
+				disable_reason
+				revision_count
+				processing
+				indicator {
+					indicatorState
+					indicatorWarning
+				}
+			}
+		}
+	}
+}`
+
+	variables := map[string]interface{}{
+		"orgId":       h.orgID,
+		"workspaceId": workspaceID,
+	}
+
+	return h.executeGraphQL(query, variables)
+}
+
 func BuildFilterSets(filters map[string][]string) []map[string]interface{} {
 	if len(filters) == 0 {
 		return []map[string]interface{}{}
 	}
 
-	filterList := make([]map[string]interface{}, 0, len(filters))
+	labelList := make([]map[string]interface{}, 0, len(filters))
 	for field, values := range filters {
-		filterList = append(filterList, map[string]interface{}{
+		labelList = append(labelList, map[string]interface{}{
 			"field":  field,
 			"values": values,
 		})
@@ -179,8 +240,8 @@ func BuildFilterSets(filters map[string][]string) []map[string]interface{} {
 
 	return []map[string]interface{}{
 		{
-			"filters": filterList,
-			"labels":  []interface{}{},
+			"filters": []interface{}{},
+			"labels":  labelList,
 		},
 	}
 }

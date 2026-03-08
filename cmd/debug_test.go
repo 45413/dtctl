@@ -2,6 +2,72 @@ package cmd
 
 import "testing"
 
+func TestDebugGetBreakpointsCommandRegistration(t *testing.T) {
+	getCmd, _, err := debugCmd.Find([]string{"get"})
+	if err != nil {
+		t.Fatalf("expected debug get command to exist, got error: %v", err)
+	}
+	if getCmd == nil || getCmd.Name() != "get" {
+		t.Fatalf("expected debug get command to exist")
+	}
+
+	breakpointsCmd, _, err := debugCmd.Find([]string{"get", "breakpoints"})
+	if err != nil {
+		t.Fatalf("expected debug get breakpoints command to exist, got error: %v", err)
+	}
+	if breakpointsCmd == nil || breakpointsCmd.Name() != "breakpoints" {
+		t.Fatalf("expected debug get breakpoints command to exist")
+	}
+}
+
+func TestExtractBreakpointRows(t *testing.T) {
+	resp := map[string]interface{}{
+		"data": map[string]interface{}{
+			"org": map[string]interface{}{
+				"workspace": map[string]interface{}{
+					"rules": []interface{}{
+						map[string]interface{}{
+							"is_disabled": false,
+							"aug_json": map[string]interface{}{
+								"location": map[string]interface{}{
+									"filename": "OrderController.java",
+									"lineno":   float64(1337),
+								},
+							},
+						},
+						map[string]interface{}{
+							"is_disabled": true,
+							"aug_json": map[string]interface{}{
+								"location": map[string]interface{}{
+									"filename": "AController.java",
+									"lineno":   float64(42),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	rows, err := extractBreakpointRows(resp)
+	if err != nil {
+		t.Fatalf("extractBreakpointRows returned error: %v", err)
+	}
+
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+
+	if rows[0].Filename != "AController.java" || rows[0].Line != 42 || rows[0].Active {
+		t.Fatalf("unexpected first row: %#v", rows[0])
+	}
+
+	if rows[1].Filename != "OrderController.java" || rows[1].Line != 1337 || !rows[1].Active {
+		t.Fatalf("unexpected second row: %#v", rows[1])
+	}
+}
+
 func TestParseFilters(t *testing.T) {
 	tests := []struct {
 		name    string

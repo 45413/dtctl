@@ -101,3 +101,46 @@ Handled variant types include:
 ## Known Remaining Risk (Low)
 
 Some very rare production-only Variant2 patterns may still require minor parity polish if observed in new live data samples. The core path and major edge branches are implemented and validated.
+
+## PR Changelog (Ready to Paste)
+
+### Summary
+
+Adds snapshot output support for DQL query results via `-o snapshot`, decoding `snapshot.data` + `snapshot.string_map` into a structured `parsed_snapshot` field using typed protobuf conversion.
+
+### Why
+
+- Snapshot records include encoded payloads that are not readable in raw form.
+- Users need decoded snapshot content directly in CLI output for analysis/troubleshooting.
+- Typed conversion provides deterministic structure and consistent output semantics.
+
+### What Changed
+
+- Added typed snapshot decode flow in `pkg/output/snapshot.go`:
+  - base64 decode `snapshot.data`
+  - unmarshal to `rookout.AugReportMessage`
+  - apply `snapshot.string_map` into string cache
+  - convert `Variant2` recursively to dict output (`@OT`, `@CT`, `@value`, `@OS`, `@attributes`, `@max_depth`)
+- Added/expanded variant coverage, including edge branches:
+  - `LARGE_INT`, `SET`, `ERROR`, `COMPLEX`, `LIVETAIL`, `FORMATTED_MESSAGE`, time formatting alignment
+- Updated tests in `pkg/output/snapshot_test.go`:
+  - migrated to typed protobuf fixtures
+  - added edge-case regression test coverage
+- Added direct dependency in `go.mod` / `go.sum`:
+  - `dynatrace.com/protocols/v11 v11.331.0`
+
+### Validation
+
+- `gofmt -w pkg/output/snapshot.go pkg/output/snapshot_test.go`
+- `go test ./pkg/output`
+- Runtime smoke check:
+  - `./dtctl query "fetch application.snapshots | sort timestamp desc | limit 1" -o snapshot > snapshot.out4.json`
+
+### Behavioral Notes
+
+- Output contract remains `parsed_snapshot`.
+- Recursive decoding of base64-looking strings was intentionally not introduced (not part of reference behavior).
+
+### Risk / Follow-up
+
+- Low risk for common paths; rare production-only Variant2 shapes may still need incremental parity tuning as encountered.
