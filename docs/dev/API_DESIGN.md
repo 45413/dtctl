@@ -651,12 +651,52 @@ dtctl delete edgeconnect <id>                    # Delete EdgeConnect
 
 ### 11. OpenPipeline
 
-**Note**: The direct OpenPipeline API (`/platform/openpipeline/v1/configurations`) is deprecated and has been migrated to Settings API v2. Use the Settings API with OpenPipeline schemas instead (see Settings API v2 section below).
+**Note**: The OpenPipeline API for managing configurations (`/platform/openpipeline/v1/configurations`) is deprecated and has been migrated to Settings API v2. Use the Settings API with OpenPipeline schemas instead (see Settings API v2 section below). Only to validate DQL processors, or Matchers use this API.
 
 ```bash
-# OpenPipeline is now managed via Settings API
-# See Settings API v2 section for details on managing pipelines, ingest sources, and routing
+# --- Matcher Operations ---
+
+# Verify if a matcher expression is valid
+dtctl exec openpipeline verify-matcher 'matchesValue(content, "error")'
+echo 'matchesValue(content, "error")' | dtctl exec openpipeline verify-matcher -
+# --- DQL Processor Operations ---
+
+# Verify if a DQL processor script is valid
+dtctl exec openpipeline verify-processor 'fieldsAdd(environment: "production")'
+echo 'fieldsAdd(env: "prod")' | dtctl exec openpipeline verify-processor -
+
+# --- Processor Preview ---
+
+# Preview a processor with sample data (requires JSON file with processor + sample record)
+dtctl exec openpipeline preview-processor -f preview-request.json
+dtctl exec openpipeline preview-processor -f preview-request.json -o json
 ```
+Sample payload for preview-processor:
+```json
+{
+  "processor": {
+    "type": "fieldsRename",
+    "enabled": false,
+    "editable": true,
+    "id": "hostname-field-normalizer",
+    "description": "hostname field normalizer",
+    "matcher": "isNotNull(\"hostname\")",
+    "sampleData": "{\"hostname\": \"raspberry-pi 4\",\"ip\":\"10.0.0.123\"}",
+    "fields": [
+      {
+        "fromName": "hostname",
+        "toName": "host.name"
+      },
+      {
+        "fromName": "ip",
+        "toName": "ip.address"
+      }
+    ]
+  }
+}
+```
+
+
 
 ### 12. Settings API v2
 
