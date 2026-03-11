@@ -114,6 +114,26 @@ func TestTokenManagerLoadAndSaveTokenBranches(t *testing.T) {
 	})
 }
 
+func TestTokenManagerGetToken_LoadError(t *testing.T) {
+	origAvail := tokenStoreKeyringAvailable
+	origGet := tokenStoreGetToken
+	defer func() {
+		tokenStoreKeyringAvailable = origAvail
+		tokenStoreGetToken = origGet
+	}()
+
+	tm, _ := NewTokenManager(DefaultOAuthConfig())
+	tokenStoreKeyringAvailable = func() bool { return true }
+	tokenStoreGetToken = func(ts *config.TokenStore, name string) (string, error) {
+		return "", errors.New("missing")
+	}
+
+	_, err := tm.GetToken("abc")
+	if err == nil {
+		t.Fatalf("expected load error")
+	}
+}
+
 func TestTokenManagerGetTokenAndRefreshPaths(t *testing.T) {
 	origAvail := tokenStoreKeyringAvailable
 	origGet := tokenStoreGetToken
@@ -194,6 +214,76 @@ func TestTokenManagerRefreshTokenNoRefreshToken(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected no refresh token error")
 	}
+}
+
+func TestTokenManagerRefreshTokenAdditionalBranches(t *testing.T) {
+	origAvail := tokenStoreKeyringAvailable
+	origGet := tokenStoreGetToken
+	origSet := tokenStoreSetToken
+	origDo := oauthHTTPDo
+	defer func() {
+		tokenStoreKeyringAvailable = origAvail
+		tokenStoreGetToken = origGet
+		tokenStoreSetToken = origSet
+		oauthHTTPDo = origDo
+	}()
+
+	tm, _ := NewTokenManager(DefaultOAuthConfig())
+	tokenStoreKeyringAvailable = func() bool { return true }
+
+	t.Run("load token error", func(t *testing.T) {
+		tokenStoreGetToken = func(ts *config.TokenStore, name string) (string, error) {
+			return "", errors.New("cannot load")
+		}
+		_, err := tm.RefreshToken("abc")
+		if err == nil {
+			t.Fatalf("expected load error")
+		}
+	})
+
+	t.Run("refresh request failure", func(t *testing.T) {
+		tokenStoreGetToken = func(ts *config.TokenStore, name string) (string, error) {
+			return storedJSON(t, StoredToken{Name: name, TokenSet: TokenSet{RefreshToken: "r1"}}), nil
+		}
+		oauthHTTPDo = func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("http down")
+		}
+		_, err := tm.RefreshToken("abc")
+		if err == nil {
+			t.Fatalf("expected refresh failure")
+		}
+	})
+
+	t.Run("preserve old refresh token when provider omits it", func(t *testing.T) {
+		tokenStoreGetToken = func(ts *config.TokenStore, name string) (string, error) {
+			return storedJSON(t, StoredToken{Name: name, TokenSet: TokenSet{RefreshToken: "old-refresh"}}), nil
+		}
+		tokenStoreSetToken = func(ts *config.TokenStore, name, token string) error { return nil }
+		oauthHTTPDo = func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"access_token":"a2","expires_in":60}`)), Header: make(http.Header)}, nil
+		}
+		tokens, err := tm.RefreshToken("abc")
+		if err != nil {
+			t.Fatalf("unexpected refresh error: %v", err)
+		}
+		if tokens.RefreshToken != "old-refresh" {
+			t.Fatalf("expected preserved refresh token, got %q", tokens.RefreshToken)
+		}
+	})
+
+	t.Run("save refreshed token failure", func(t *testing.T) {
+		tokenStoreGetToken = func(ts *config.TokenStore, name string) (string, error) {
+			return storedJSON(t, StoredToken{Name: name, TokenSet: TokenSet{RefreshToken: "r1"}}), nil
+		}
+		tokenStoreSetToken = func(ts *config.TokenStore, name, token string) error { return errors.New("cannot save") }
+		oauthHTTPDo = func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"access_token":"a2","refresh_token":"r2","expires_in":60}`)), Header: make(http.Header)}, nil
+		}
+		_, err := tm.RefreshToken("abc")
+		if err == nil {
+			t.Fatalf("expected save failure")
+		}
+	})
 }
 
 func TestTokenManagerGetTokenInfo(t *testing.T) {
