@@ -12,6 +12,14 @@ import (
 	"github.com/dynatrace-oss/dtctl/pkg/safety"
 )
 
+var deleteAllBreakpointsOp = func(handler *livedebugger.Handler, workspaceID string) (map[string]interface{}, error) {
+	return handler.DeleteAllBreakpoints(workspaceID)
+}
+
+var deleteBreakpointOp = func(handler *livedebugger.Handler, workspaceID, breakpointID string) (map[string]interface{}, error) {
+	return handler.DeleteBreakpoint(workspaceID, breakpointID)
+}
+
 var deleteBreakpointCmd = &cobra.Command{
 	Use:     "breakpoint <id|filename:line>",
 	Aliases: []string{"breakpoints", "bp"},
@@ -153,7 +161,7 @@ func runDeleteAllBreakpoints(handler *livedebugger.Handler, workspaceID string, 
 		return printBreakpointMessage("delete", fmt.Sprintf("Dry run: would delete %d breakpoint(s) from the current workspace", len(rows)))
 	}
 
-	deleteResp, err := handler.DeleteAllBreakpoints(workspaceID)
+	deleteResp, err := deleteAllBreakpointsOp(handler, workspaceID)
 	if err != nil {
 		if verbose {
 			_ = printGraphQLResponse("deleteAllRulesFromWorkspaceV2", deleteResp)
@@ -208,7 +216,7 @@ func runDeleteBreakpointRows(handler *livedebugger.Handler, workspaceID string, 
 	deletedRows := make([]breakpointRow, 0, len(rows))
 	failures := make([]string, 0)
 	for _, row := range rows {
-		deleteResp, err := handler.DeleteBreakpoint(workspaceID, row.ID)
+		deleteResp, err := deleteBreakpointOp(handler, workspaceID, row.ID)
 		if err != nil {
 			if verbose {
 				_ = printGraphQLResponse("deleteRuleV2", deleteResp)

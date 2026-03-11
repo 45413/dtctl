@@ -2,8 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dynatrace-oss/dtctl/pkg/client"
+	"github.com/dynatrace-oss/dtctl/pkg/config"
+	"github.com/dynatrace-oss/dtctl/pkg/resources/livedebugger"
 )
 
 func TestBuildBreakpointStatusResult(t *testing.T) {
@@ -274,5 +280,223 @@ func TestPrintBreakpointIssuesSection(t *testing.T) {
 		if !strings.Contains(text, mustContain) {
 			t.Fatalf("expected output to contain %q, got: %q", mustContain, text)
 		}
+	}
+}
+
+func TestRunDescribeCommand(t *testing.T) {
+	t.Run("no args requires subcommand", func(t *testing.T) {
+		err := runDescribeCommand(describeCmd, nil)
+		if err == nil {
+			t.Fatalf("expected subcommand error")
+		}
+	})
+
+	t.Run("non-breakpoint identifier requires subcommand", func(t *testing.T) {
+		err := runDescribeCommand(describeCmd, []string{"slo"})
+		if err == nil {
+			t.Fatalf("expected subcommand error")
+		}
+	})
+}
+
+func TestRunDescribeBreakpoint_LoadConfigError(t *testing.T) {
+	originalCfgFile := cfgFile
+	defer func() { cfgFile = originalCfgFile }()
+
+	cfgFile = filepath.Join(t.TempDir(), "missing-config.yaml")
+
+	err := runDescribeBreakpoint(describeCmd, "OrderController.java:306")
+	if err == nil {
+		t.Fatalf("expected load config error")
+	}
+}
+
+func TestRunDescribeBreakpoint_StructuredSuccess(t *testing.T) {
+	originalOutputFormat := outputFormat
+	originalAgentMode := agentMode
+	originalDebugMode := debugMode
+	originalVerbosity := verbosity
+	originalLoadConfig := loadConfigForLiveDebugger
+	originalNewClient := newClientFromConfigLiveDebugger
+	originalNewHandler := newLiveDebuggerHandler
+	originalGetOrCreate := getOrCreateWorkspaceLiveDebugger
+	originalGetRules := getWorkspaceRulesLiveDebugger
+	originalGetStatus := getRuleStatusBreakdownLiveDebugger
+	defer func() {
+		outputFormat = originalOutputFormat
+		agentMode = originalAgentMode
+		debugMode = originalDebugMode
+		verbosity = originalVerbosity
+		loadConfigForLiveDebugger = originalLoadConfig
+		newClientFromConfigLiveDebugger = originalNewClient
+		newLiveDebuggerHandler = originalNewHandler
+		getOrCreateWorkspaceLiveDebugger = originalGetOrCreate
+		getWorkspaceRulesLiveDebugger = originalGetRules
+		getRuleStatusBreakdownLiveDebugger = originalGetStatus
+	}()
+
+	outputFormat = "json"
+	agentMode = false
+	debugMode = false
+	verbosity = 0
+
+	loadConfigForLiveDebugger = func() (*config.Config, error) {
+		cfg := config.NewConfig()
+		cfg.SetContext("test", "https://example.invalid", "token")
+		cfg.CurrentContext = "test"
+		return cfg, nil
+	}
+	newClientFromConfigLiveDebugger = func(cfg *config.Config) (*client.Client, error) { return nil, nil }
+	newLiveDebuggerHandler = func(c *client.Client, environment string) (*livedebugger.Handler, error) { return nil, nil }
+	getOrCreateWorkspaceLiveDebugger = func(handler *livedebugger.Handler, projectPath string) (map[string]interface{}, string, error) {
+		return map[string]interface{}{"data": map[string]interface{}{}}, "ws-1", nil
+	}
+	getWorkspaceRulesLiveDebugger = func(handler *livedebugger.Handler, workspaceID string) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"data": map[string]interface{}{
+				"org": map[string]interface{}{
+					"workspace": map[string]interface{}{
+						"rules": []interface{}{
+							map[string]interface{}{
+								"id":          "bp-1",
+								"is_disabled": false,
+								"aug_json": map[string]interface{}{
+									"location": map[string]interface{}{"filename": "OrderController.java", "lineno": float64(306)},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, nil
+	}
+	getRuleStatusBreakdownLiveDebugger = func(handler *livedebugger.Handler, ruleID string) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"data": map[string]interface{}{
+				"org": map[string]interface{}{
+					"ruleStatuses": []interface{}{},
+				},
+			},
+		}, nil
+	}
+
+	output := captureStdout(t, func() {
+		if err := runDescribeBreakpoint(describeCmd, "bp-1"); err != nil {
+			t.Fatalf("runDescribeBreakpoint returned error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "\"id\": \"bp-1\"") {
+		t.Fatalf("unexpected structured output: %q", output)
+	}
+}
+
+func TestRunDescribeBreakpoint_DirectIDSuccess(t *testing.T) {
+	originalOutputFormat := outputFormat
+	originalLoadConfig := loadConfigForLiveDebugger
+	originalNewClient := newClientFromConfigLiveDebugger
+	originalNewHandler := newLiveDebuggerHandler
+	originalGetOrCreate := getOrCreateWorkspaceLiveDebugger
+	originalGetRules := getWorkspaceRulesLiveDebugger
+	originalGetStatus := getRuleStatusBreakdownLiveDebugger
+	defer func() {
+		outputFormat = originalOutputFormat
+		loadConfigForLiveDebugger = originalLoadConfig
+		newClientFromConfigLiveDebugger = originalNewClient
+		newLiveDebuggerHandler = originalNewHandler
+		getOrCreateWorkspaceLiveDebugger = originalGetOrCreate
+		getWorkspaceRulesLiveDebugger = originalGetRules
+		getRuleStatusBreakdownLiveDebugger = originalGetStatus
+	}()
+
+	outputFormat = "json"
+	loadConfigForLiveDebugger = func() (*config.Config, error) {
+		cfg := config.NewConfig()
+		cfg.SetContext("test", "https://example.invalid", "token")
+		cfg.CurrentContext = "test"
+		return cfg, nil
+	}
+	newClientFromConfigLiveDebugger = func(cfg *config.Config) (*client.Client, error) { return nil, nil }
+	newLiveDebuggerHandler = func(c *client.Client, environment string) (*livedebugger.Handler, error) { return nil, nil }
+	getOrCreateWorkspaceLiveDebugger = func(handler *livedebugger.Handler, projectPath string) (map[string]interface{}, string, error) {
+		return map[string]interface{}{"data": map[string]interface{}{}}, "ws-1", nil
+	}
+	getWorkspaceRulesLiveDebugger = func(handler *livedebugger.Handler, workspaceID string) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"data": map[string]interface{}{
+				"org": map[string]interface{}{
+					"workspace": map[string]interface{}{
+						"rules": []interface{}{},
+					},
+				},
+			},
+		}, nil
+	}
+	getRuleStatusBreakdownLiveDebugger = func(handler *livedebugger.Handler, ruleID string) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"data": map[string]interface{}{
+				"org": map[string]interface{}{
+					"ruleStatuses": []interface{}{},
+				},
+			},
+		}, nil
+	}
+
+	output := captureStdout(t, func() {
+		if err := runDescribeBreakpoint(describeCmd, "123456789"); err != nil {
+			t.Fatalf("runDescribeBreakpoint returned error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "\"id\": \"123456789\"") {
+		t.Fatalf("unexpected direct-id output: %q", output)
+	}
+}
+
+func TestRunDescribeBreakpoint_StatusBreakdownError(t *testing.T) {
+	originalLoadConfig := loadConfigForLiveDebugger
+	originalNewClient := newClientFromConfigLiveDebugger
+	originalNewHandler := newLiveDebuggerHandler
+	originalGetOrCreate := getOrCreateWorkspaceLiveDebugger
+	originalGetRules := getWorkspaceRulesLiveDebugger
+	originalGetStatus := getRuleStatusBreakdownLiveDebugger
+	defer func() {
+		loadConfigForLiveDebugger = originalLoadConfig
+		newClientFromConfigLiveDebugger = originalNewClient
+		newLiveDebuggerHandler = originalNewHandler
+		getOrCreateWorkspaceLiveDebugger = originalGetOrCreate
+		getWorkspaceRulesLiveDebugger = originalGetRules
+		getRuleStatusBreakdownLiveDebugger = originalGetStatus
+	}()
+
+	loadConfigForLiveDebugger = func() (*config.Config, error) {
+		cfg := config.NewConfig()
+		cfg.SetContext("test", "https://example.invalid", "token")
+		cfg.CurrentContext = "test"
+		return cfg, nil
+	}
+	newClientFromConfigLiveDebugger = func(cfg *config.Config) (*client.Client, error) { return nil, nil }
+	newLiveDebuggerHandler = func(c *client.Client, environment string) (*livedebugger.Handler, error) { return nil, nil }
+	getOrCreateWorkspaceLiveDebugger = func(handler *livedebugger.Handler, projectPath string) (map[string]interface{}, string, error) {
+		return map[string]interface{}{"data": map[string]interface{}{}}, "ws-1", nil
+	}
+	getWorkspaceRulesLiveDebugger = func(handler *livedebugger.Handler, workspaceID string) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"data": map[string]interface{}{
+				"org": map[string]interface{}{
+					"workspace": map[string]interface{}{
+						"rules": []interface{}{map[string]interface{}{"id": "bp-1"}},
+					},
+				},
+			},
+		}, nil
+	}
+	getRuleStatusBreakdownLiveDebugger = func(handler *livedebugger.Handler, ruleID string) (map[string]interface{}, error) {
+		return nil, errors.New("status query failed")
+	}
+
+	err := runDescribeBreakpoint(describeCmd, "bp-1")
+	if err == nil {
+		t.Fatalf("expected status breakdown error")
 	}
 }

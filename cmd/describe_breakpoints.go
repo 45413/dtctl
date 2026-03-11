@@ -9,8 +9,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-
-	"github.com/dynatrace-oss/dtctl/pkg/resources/livedebugger"
 )
 
 type breakpointStatusResult struct {
@@ -89,7 +87,7 @@ func shouldHandleAsBreakpointDescribe(identifier string) bool {
 func runDescribeBreakpoint(cmd *cobra.Command, identifier string) error {
 	verbose := isDebugVerbose()
 
-	cfg, err := LoadConfig()
+	cfg, err := loadConfigForLiveDebugger()
 	if err != nil {
 		return err
 	}
@@ -99,17 +97,17 @@ func runDescribeBreakpoint(cmd *cobra.Command, identifier string) error {
 		return err
 	}
 
-	c, err := NewClientFromConfig(cfg)
+	c, err := newClientFromConfigLiveDebugger(cfg)
 	if err != nil {
 		return err
 	}
 
-	handler, err := livedebugger.NewHandler(c, ctx.Environment)
+	handler, err := newLiveDebuggerHandler(c, ctx.Environment)
 	if err != nil {
 		return err
 	}
 
-	workspaceResp, workspaceID, err := handler.GetOrCreateWorkspace(currentProjectPath())
+	workspaceResp, workspaceID, err := getOrCreateWorkspaceLiveDebugger(handler, currentProjectPath())
 	if err != nil {
 		if verbose {
 			_ = printGraphQLResponse("getOrCreateWorkspaceV2", workspaceResp)
@@ -122,7 +120,7 @@ func runDescribeBreakpoint(cmd *cobra.Command, identifier string) error {
 		}
 	}
 
-	workspaceRulesResp, err := handler.GetWorkspaceRules(workspaceID)
+	workspaceRulesResp, err := getWorkspaceRulesLiveDebugger(handler, workspaceID)
 	if err != nil {
 		if verbose {
 			_ = printGraphQLResponse("getWorkspaceRules", workspaceRulesResp)
@@ -151,7 +149,7 @@ func runDescribeBreakpoint(cmd *cobra.Command, identifier string) error {
 	results := make([]breakpointStatusResult, 0, len(targetRules))
 	for _, rule := range targetRules {
 		ruleID := stringValue(rule["id"])
-		statusResp, err := handler.GetRuleStatusBreakdown(ruleID)
+		statusResp, err := getRuleStatusBreakdownLiveDebugger(handler, ruleID)
 		if err != nil {
 			if verbose {
 				_ = printGraphQLResponse("GetRuleStatusBreakdown", statusResp)

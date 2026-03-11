@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/dynatrace-oss/dtctl/pkg/config"
+	"github.com/dynatrace-oss/dtctl/pkg/resources/livedebugger"
 )
 
 func TestDeleteBreakpointCommandRegistration(t *testing.T) {
@@ -208,5 +210,124 @@ func TestRunDeleteBreakpointRows_DryRun(t *testing.T) {
 	}
 	if !strings.Contains(output, "Dry run: would delete breakpoint bp-2 (OrderController.java:307)") {
 		t.Fatalf("missing second dry-run output: %q", output)
+	}
+}
+
+func TestRunDeleteAllBreakpoints_Success(t *testing.T) {
+	originalDryRun := dryRun
+	originalOutputFormat := outputFormat
+	originalAgentMode := agentMode
+	originalPlainMode := plainMode
+	originalDeleteAllOp := deleteAllBreakpointsOp
+	defer func() {
+		dryRun = originalDryRun
+		outputFormat = originalOutputFormat
+		agentMode = originalAgentMode
+		plainMode = originalPlainMode
+		deleteAllBreakpointsOp = originalDeleteAllOp
+	}()
+
+	dryRun = false
+	outputFormat = "table"
+	agentMode = false
+	plainMode = true
+	deleteAllBreakpointsOp = func(handler *livedebugger.Handler, workspaceID string) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"data": map[string]interface{}{
+				"org": map[string]interface{}{
+					"workspace": map[string]interface{}{
+						"deleteAllRulesFromWorkspaceV2": []interface{}{"imm-1", "imm-2"},
+					},
+				},
+			},
+		}, nil
+	}
+
+	rows := []breakpointRow{{ID: "bp-1", Filename: "A.java", Line: 10}}
+	output := captureStdout(t, func() {
+		if err := runDeleteAllBreakpoints(nil, "workspace-1", rows, true, false); err != nil {
+			t.Fatalf("runDeleteAllBreakpoints returned error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "Deleted 2 breakpoint(s)") {
+		t.Fatalf("unexpected output: %q", output)
+	}
+}
+
+func TestRunDeleteAllBreakpoints_MalformedResponse(t *testing.T) {
+	originalDryRun := dryRun
+	originalDeleteAllOp := deleteAllBreakpointsOp
+	defer func() {
+		dryRun = originalDryRun
+		deleteAllBreakpointsOp = originalDeleteAllOp
+	}()
+
+	dryRun = false
+	deleteAllBreakpointsOp = func(handler *livedebugger.Handler, workspaceID string) (map[string]interface{}, error) {
+		return map[string]interface{}{"data": map[string]interface{}{}}, nil
+	}
+
+	rows := []breakpointRow{{ID: "bp-1", Filename: "A.java", Line: 10}}
+	err := runDeleteAllBreakpoints(nil, "workspace-1", rows, true, false)
+	if err == nil {
+		t.Fatalf("expected error for malformed deleteAll response")
+	}
+	if !strings.Contains(err.Error(), "missing org object") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunDeleteBreakpointRows_Empty(t *testing.T) {
+	if err := runDeleteBreakpointRows(nil, "workspace-1", nil, true, false); err != nil {
+		t.Fatalf("expected nil error for empty rows, got: %v", err)
+	}
+}
+
+func TestRunDeleteBreakpointRows_PartialFailure(t *testing.T) {
+	originalDryRun := dryRun
+	originalOutputFormat := outputFormat
+	originalAgentMode := agentMode
+	originalPlainMode := plainMode
+	originalDeleteOp := deleteBreakpointOp
+	defer func() {
+		dryRun = originalDryRun
+		outputFormat = originalOutputFormat
+		agentMode = originalAgentMode
+		plainMode = originalPlainMode
+		deleteBreakpointOp = originalDeleteOp
+	}()
+
+	dryRun = false
+	outputFormat = "table"
+	agentMode = false
+	plainMode = true
+	deleteBreakpointOp = func(handler *livedebugger.Handler, workspaceID, breakpointID string) (map[string]interface{}, error) {
+		if breakpointID == "bp-2" {
+			return nil, errors.New("remote delete failed")
+		}
+		return map[string]interface{}{"ok": true}, nil
+	}
+
+	rows := []breakpointRow{
+		{ID: "bp-1", Filename: "OrderController.java", Line: 306},
+		{ID: "bp-2", Filename: "OrderController.java", Line: 307},
+	}
+
+	output := captureStdout(t, func() {
+		err := runDeleteBreakpointRows(nil, "workspace-1", rows, true, false)
+		if err == nil {
+			t.Fatalf("expected partial failure error")
+		}
+		if !strings.Contains(err.Error(), "bp-2") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "Deleted breakpoint bp-1 (OrderController.java:306)") {
+		t.Fatalf("missing success output: %q", output)
+	}
+	if !strings.Contains(output, "Failed to delete 1 breakpoint(s) after deleting 1 successfully") {
+		t.Fatalf("missing partial-failure summary: %q", output)
 	}
 }
