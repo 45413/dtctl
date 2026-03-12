@@ -13,6 +13,7 @@ import (
 
 	"github.com/dynatrace-oss/dtctl/pkg/client"
 	"github.com/dynatrace-oss/dtctl/pkg/config"
+	"github.com/dynatrace-oss/dtctl/pkg/output"
 	"github.com/dynatrace-oss/dtctl/pkg/resources/livedebugger"
 	"github.com/dynatrace-oss/dtctl/pkg/safety"
 )
@@ -192,7 +193,12 @@ func runGetBreakpointsWithDeps(cmd *cobra.Command, args []string, deps liveDebug
 		return err
 	}
 
-	printer := NewPrinter()
+	var printer output.Printer
+	if agentMode {
+		printer = output.NewAgentPrinter(rootCmd.OutOrStdout(), &output.ResponseContext{})
+	} else {
+		printer = output.NewPrinterWithOptions(outputFormat, rootCmd.OutOrStdout(), plainMode)
+	}
 	_ = enrichAgent(printer, "get", "breakpoint")
 	return printer.PrintList(rows)
 }

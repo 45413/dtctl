@@ -362,11 +362,13 @@ func TestRunGetBreakpoints_StructuredView(t *testing.T) {
 	originalAgentMode := agentMode
 	originalDebugMode := debugMode
 	originalVerbosity := verbosity
+	originalOut := rootCmd.OutOrStdout()
 	defer func() {
 		outputFormat = originalOutputFormat
 		agentMode = originalAgentMode
 		debugMode = originalDebugMode
 		verbosity = originalVerbosity
+		rootCmd.SetOut(originalOut)
 	}()
 
 	outputFormat = "json"
@@ -406,11 +408,14 @@ func TestRunGetBreakpoints_StructuredView(t *testing.T) {
 		}, nil
 	}
 
-	output := captureStdout(t, func() {
-		if err := runGetBreakpointsWithDeps(nil, nil, deps); err != nil {
-			t.Fatalf("runGetBreakpoints returned error: %v", err)
-		}
-	})
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+
+	if err := runGetBreakpointsWithDeps(nil, nil, deps); err != nil {
+		t.Fatalf("runGetBreakpoints returned error: %v", err)
+	}
+
+	output := out.String()
 
 	if !strings.Contains(output, "\"id\": \"bp-1\"") || !strings.Contains(output, "\"filename\": \"OrderController.java\"") {
 		t.Fatalf("unexpected structured output: %q", output)
@@ -422,11 +427,13 @@ func TestRunGetBreakpoints_AgentEnvelope(t *testing.T) {
 	originalAgentMode := agentMode
 	originalDebugMode := debugMode
 	originalVerbosity := verbosity
+	originalOut := rootCmd.OutOrStdout()
 	defer func() {
 		outputFormat = originalOutputFormat
 		agentMode = originalAgentMode
 		debugMode = originalDebugMode
 		verbosity = originalVerbosity
+		rootCmd.SetOut(originalOut)
 	}()
 
 	outputFormat = ""
@@ -466,11 +473,14 @@ func TestRunGetBreakpoints_AgentEnvelope(t *testing.T) {
 		}, nil
 	}
 
-	output := captureStdout(t, func() {
-		if err := runGetBreakpointsWithDeps(nil, nil, deps); err != nil {
-			t.Fatalf("runGetBreakpoints returned error: %v", err)
-		}
-	})
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+
+	if err := runGetBreakpointsWithDeps(nil, nil, deps); err != nil {
+		t.Fatalf("runGetBreakpoints returned error: %v", err)
+	}
+
+	output := out.String()
 
 	if !strings.Contains(output, "\"ok\": true") || !strings.Contains(output, "\"resource\": \"breakpoint\"") {
 		t.Fatalf("unexpected agent output: %q", output)
