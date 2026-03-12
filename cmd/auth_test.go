@@ -13,6 +13,7 @@ import (
 // setupAuthTestConfig creates a temporary config with the given context and returns the path.
 func setupAuthTestConfig(t *testing.T, contextName, environment, tokenRef string) string {
 	t.Helper()
+	t.Setenv("DTCTL_DISABLE_KEYRING", "1")
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -139,7 +140,15 @@ func TestAuthLogin_PartialFlags_EnvironmentFromContext(t *testing.T) {
 	rootCmd.SetArgs([]string{"auth", "login", "--context", ctxName})
 	err := rootCmd.Execute()
 
-	if err != nil && strings.Contains(err.Error(), "--context and --environment are required") {
+	if err == nil {
+		t.Fatal("expected command to fail in test environment")
+	}
+
+	if strings.Contains(err.Error(), "--context and --environment are required") {
 		t.Errorf("expected environment to be filled from current context, but got: %v", err)
+	}
+
+	if !strings.Contains(err.Error(), "OAuth login requires a working system keyring") {
+		t.Errorf("expected keyring error for deterministic non-interactive test path, got: %v", err)
 	}
 }
