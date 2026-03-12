@@ -1,26 +1,56 @@
 package cmd
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func TestEditBreakpointCommandRegistration(t *testing.T) {
-	editCmd, _, err := rootCmd.Find([]string{"edit"})
+func TestUpdateBreakpointCommandRegistration(t *testing.T) {
+	updateCmd, _, err := rootCmd.Find([]string{"update"})
 	if err != nil {
-		t.Fatalf("expected edit command to exist, got error: %v", err)
+		t.Fatalf("expected update command to exist, got error: %v", err)
 	}
-	if editCmd == nil || editCmd.Name() != "edit" {
-		t.Fatalf("expected edit command to exist")
+	if updateCmd == nil || updateCmd.Name() != "update" {
+		t.Fatalf("expected update command to exist")
 	}
 
-	breakpointCmd, _, err := rootCmd.Find([]string{"edit", "breakpoint"})
+	breakpointCmd, _, err := rootCmd.Find([]string{"update", "breakpoint"})
 	if err != nil {
-		t.Fatalf("expected edit breakpoint command to exist, got error: %v", err)
+		t.Fatalf("expected update breakpoint command to exist, got error: %v", err)
 	}
 	if breakpointCmd == nil || breakpointCmd.Name() != "breakpoint" {
-		t.Fatalf("expected edit breakpoint command to exist")
+		t.Fatalf("expected update breakpoint command to exist")
+	}
+
+	breakpointsCmd, _, err := rootCmd.Find([]string{"update", "breakpoints"})
+	if err != nil {
+		t.Fatalf("expected update breakpoints alias to exist, got error: %v", err)
+	}
+	if breakpointsCmd == nil || breakpointsCmd.Name() != "breakpoint" {
+		t.Fatalf("expected update breakpoints alias to resolve to breakpoint command")
+	}
+}
+
+func TestUpdateBreakpointFilters_NoIdentifier_NoPanic(t *testing.T) {
+	viper.Reset()
+
+	tmpDir := t.TempDir()
+	cfgFile = filepath.Join(tmpDir, "missing-config.yaml")
+	defer func() { cfgFile = "" }()
+
+	rootCmd.SetArgs([]string{"update", "breakpoint", "--filters", "k8s.container.name=credit-card-order-service"})
+	err := rootCmd.Execute()
+
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+
+	if strings.Contains(strings.ToLower(err.Error()), "slice bounds out of range") {
+		t.Fatalf("unexpected panic-like error: %v", err)
 	}
 }
 

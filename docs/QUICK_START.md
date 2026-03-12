@@ -2898,9 +2898,12 @@ For complete guidance, see [LIVE_DEBUGGER.md](LIVE_DEBUGGER.md).
 
 ### Configure target filters
 
+`--filters` accepts both `key:value` and `key=value` pairs.
+
 ```bash
-dtctl debug --filters k8s.namespace.name=prod
-dtctl debug --filters k8s.namespace.name=prod,dt.entity.host=HOST-123
+dtctl update breakpoint --filters k8s.namespace.name:prod
+dtctl update breakpoints --filters k8s.namespace.name:prod,dt.entity.host:HOST-123
+dtctl update breakpoint --filters k8s.namespace.name=prod,dt.entity.host=HOST-123
 ```
 
 ### Breakpoint lifecycle
@@ -2917,8 +2920,8 @@ dtctl describe OrderController.java:306
 dtctl describe dtctl-rule-123
 
 # Edit condition / enabled state
-dtctl edit breakpoint OrderController.java:306 --condition "orderId != null"
-dtctl edit breakpoint OrderController.java:306 --enabled false
+dtctl update breakpoint OrderController.java:306 --condition "orderId != null"
+dtctl update breakpoint OrderController.java:306 --enabled false
 
 # Delete by ID, by location, or all
 dtctl delete breakpoint dtctl-rule-123

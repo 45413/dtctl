@@ -20,27 +20,121 @@ const (
 )
 
 var editBreakpointCmd = &cobra.Command{
-	Use:     "breakpoint <id|filename:line>",
+	Use:     "breakpoint [<id|filename:line>]",
 	Aliases: []string{"breakpoints", "bp"},
-	Short:   "Edit a Live Debugger breakpoint",
-	Long: `Edit Live Debugger breakpoints by mutable rule ID or by source location.
+	Short:   "Update Live Debugger breakpoints and workspace filters",
+	Long: `Update Live Debugger breakpoints by mutable rule ID or source location,
+or update workspace filters for the current project.
 
 Examples:
   # Add or update a condition
-  dtctl edit breakpoint dtctl-rule-123 --condition "value>othervalue"
+	 dtctl update breakpoint dtctl-rule-123 --condition "value>othervalue"
 
   # Enable a breakpoint
-  dtctl edit breakpoint OrderController.java:306 --enabled true
+	 dtctl update breakpoint OrderController.java:306 --enabled true
 
   # Disable a breakpoint
-  dtctl edit breakpoint OrderController.java:306 --enabled false
+	 dtctl update breakpoint OrderController.java:306 --enabled false
+
+  # Update workspace filters
+	 dtctl update breakpoint --filters k8s.namespace.name:prod
+	 dtctl update breakpoint --filters k8s.namespace.name:prod,dt.entity.host:HOST-123
 `,
-	Args: cobra.RangeArgs(1, 2),
+	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		verbose := isDebugVerbose()
+		filters, _ := cmd.Flags().GetString("filters")
+		filtersChanged := cmd.Flags().Changed("filters")
+		trailingArgs := []string{}
+		if len(args) > 1 {
+			trailingArgs = args[1:]
+		}
+
 		conditionChanged := cmd.Flags().Changed("condition")
-		enabled, enabledChanged, err := getOptionalBoolFlag(cmd, "enabled", args[1:])
+		enabled, enabledChanged, err := getOptionalBoolFlag(cmd, "enabled", trailingArgs)
 		if err != nil {
 			return err
+		}
+
+		if filtersChanged {
+			if strings.TrimSpace(filters) == "" {
+				return fmt.Errorf("--filters is required")
+			}
+			if conditionChanged || enabledChanged {
+				return fmt.Errorf("--filters cannot be combined with --condition or --enabled")
+			}
+			if len(args) > 0 {
+				return fmt.Errorf("--filters does not accept a breakpoint identifier")
+			}
+
+			cfg, err := LoadConfig()
+			if err != nil {
+				return err
+			}
+
+			ctx, err := cfg.CurrentContextObj()
+			if err != nil {
+				return err
+			}
+
+			checker, err := NewSafetyChecker(cfg)
+			if err != nil {
+				return err
+			}
+			if err := checker.CheckError(safety.OperationUpdate, safety.OwnershipUnknown); err != nil {
+				return err
+			}
+
+			if dryRun {
+				return printBreakpointMessage("update", fmt.Sprintf("Dry run: would update Live Debugger workspace filters (%s)", strings.TrimSpace(filters)))
+			}
+
+			c, err := NewClientFromConfig(cfg)
+			if err != nil {
+				return err
+			}
+
+			handler, err := livedebugger.NewHandler(c, ctx.Environment)
+			if err != nil {
+				return err
+			}
+
+			workspaceResp, workspaceID, err := handler.GetOrCreateWorkspace(currentProjectPath())
+			if err != nil {
+				if verbose {
+					_ = printGraphQLResponse("getOrCreateWorkspaceV2", workspaceResp)
+				}
+				return err
+			}
+			if verbose {
+				if err := printGraphQLResponse("getOrCreateWorkspaceV2", workspaceResp); err != nil {
+					return err
+				}
+			}
+
+			parsedFilters, err := parseFilters(filters)
+			if err != nil {
+				return err
+			}
+
+			updateResp, err := handler.UpdateWorkspaceFilters(workspaceID, livedebugger.BuildFilterSets(parsedFilters))
+			if err != nil {
+				if verbose {
+					_ = printGraphQLResponse("updateWorkspaceV2", updateResp)
+				}
+				return err
+			}
+			if verbose {
+				if err := printGraphQLResponse("updateWorkspaceV2", updateResp); err != nil {
+					return err
+				}
+			}
+
+			return printBreakpointMessage("update", "Updated Live Debugger workspace filters")
+		}
+
+		if len(args) == 0 {
+			return fmt.Errorf("accepts 1 arg(s), received 0")
 		}
 		if len(args) > 1 && !enabledChanged {
 			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
@@ -51,7 +145,6 @@ Examples:
 
 		condition, _ := cmd.Flags().GetString("condition")
 		identifier := strings.TrimSpace(args[0])
-		verbose := isDebugVerbose()
 
 		cfg, err := LoadConfig()
 		if err != nil {
@@ -73,7 +166,7 @@ Examples:
 
 		if dryRun {
 			changes := describeBreakpointEdits(conditionChanged, condition, enabledChanged, enabled)
-			return printBreakpointMessage("edit", fmt.Sprintf("Dry run: would edit breakpoint %s (%s)", identifier, changes))
+			return printBreakpointMessage("update", fmt.Sprintf("Dry run: would update breakpoint %s (%s)", identifier, changes))
 		}
 
 		c, err := NewClientFromConfig(cfg)
@@ -173,7 +266,7 @@ Examples:
 			}
 		}
 
-		return printBreakpointMessage("edit", fmt.Sprintf("Edited breakpoint %s (%s)", targetDescription, describeBreakpointEdits(conditionChanged, condition, enabledChanged, enabled)))
+		return printBreakpointMessage("update", fmt.Sprintf("Updated breakpoint %s (%s)", targetDescription, describeBreakpointEdits(conditionChanged, condition, enabledChanged, enabled)))
 	},
 }
 
@@ -426,8 +519,9 @@ func getOptionalBoolFlag(cmd *cobra.Command, flagName string, trailingArgs []str
 }
 
 func init() {
-	editCmd.AddCommand(editBreakpointCmd)
+	updateCmd.AddCommand(editBreakpointCmd)
 	editBreakpointCmd.Flags().String("condition", "", "Condition expression for the breakpoint")
 	editBreakpointCmd.Flags().String("enabled", "", "Enable or disable the breakpoint")
+	editBreakpointCmd.Flags().String("filters", "", "workspace filters to apply (comma-separated key:value pairs)")
 	editBreakpointCmd.Flags().Lookup("enabled").NoOptDefVal = "true"
 }

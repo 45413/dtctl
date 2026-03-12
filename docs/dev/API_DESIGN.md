@@ -1741,18 +1741,20 @@ This output mode is intended for Live Debugger snapshot inspection and automatio
 Live Debugger follows the standard verb-noun grammar and avoids introducing a separate command tree:
 
 ```bash
-dtctl debug --filters key=value[,key=value...]                 # configure workspace filters
+dtctl update breakpoint --filters key:value[,key:value...]     # configure workspace filters
 dtctl create breakpoint File.java:line                         # create breakpoint
 dtctl get breakpoints                                          # list breakpoints
 dtctl describe <breakpoint-id|filename:line>                   # describe breakpoint rollout/status
-dtctl edit breakpoint <id|filename:line> --condition "..."     # edit condition
-dtctl edit breakpoint <id|filename:line> --enabled true|false  # enable/disable
+dtctl update breakpoint <id|filename:line> --condition "..."   # update condition
+dtctl update breakpoint <id|filename:line> --enabled true|false # enable/disable
 dtctl delete breakpoint <id|filename:line|--all>               # delete breakpoints
 ```
 
+`--filters` accepts both `key:value` and `key=value` forms.
+
 Design notes:
 - `dtctl describe` keeps existing resource-subcommand behavior; breakpoint describe is only routed for breakpoint-like identifiers.
-- Mutating operations (`debug` filter update, `create`, `edit`, `delete`) must run safety checks, including in dry-run mode.
+- Mutating operations (`update` filter update, `create`, `update`, `delete`) must run safety checks, including in dry-run mode.
 
 ## Examples
 

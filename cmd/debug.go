@@ -316,9 +316,12 @@ func parseFilters(input string) (map[string][]string, error) {
 			continue
 		}
 
-		key, value, found := strings.Cut(trimmed, "=")
+		key, value, found := strings.Cut(trimmed, ":")
 		if !found {
-			return nil, fmt.Errorf("invalid filter %q: expected key=value", trimmed)
+			key, value, found = strings.Cut(trimmed, "=")
+		}
+		if !found {
+			return nil, fmt.Errorf("invalid filter %q: expected key:value", trimmed)
 		}
 
 		key = strings.TrimSpace(key)
@@ -391,5 +394,4 @@ func buildGraphQLResponse(operation string, payload map[string]interface{}) map[
 
 func init() {
 	debugCmd.Flags().StringVar(&debugFilters, "filters", "", "filters to apply (comma-separated key=value pairs)")
-	rootCmd.AddCommand(debugCmd)
 }

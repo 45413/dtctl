@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Live Debugger CLI workflow**
-  - `dtctl debug --filters ...` for workspace filter configuration
+  - `dtctl update breakpoint --filters ...` for workspace filter configuration
   - `dtctl create breakpoint <file:line>` for breakpoint creation
   - `dtctl get breakpoints` with breakpoint ID in default table output
   - `dtctl describe <id|filename:line>` for breakpoint rollout/status breakdown
-  - `dtctl edit breakpoint <id|filename:line> --condition/--enabled`
+  - `dtctl update breakpoint <id|filename:line> --condition/--enabled`
   - `dtctl delete breakpoint <id|filename:line|--all>` with confirmation / `-y` / `--dry-run`
 - **Snapshot query output mode**
   - `dtctl query ... -o snapshot` decodes Live Debugger snapshot payloads and enriches records with `parsed_snapshot`

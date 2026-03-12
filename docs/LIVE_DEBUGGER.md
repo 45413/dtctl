@@ -6,11 +6,11 @@ This guide explains how to use Dynatrace Live Debugger features from `dtctl`.
 
 The current Live Debugger flow in `dtctl` supports:
 
-- configuring workspace filters with `dtctl debug --filters ...`
+- configuring workspace filters with `dtctl update breakpoint --filters ...`
 - creating breakpoints with `dtctl create breakpoint File.java:line`
 - listing breakpoints with `dtctl get breakpoints`
 - describing breakpoint status with `dtctl describe <id|filename:line>`
-- editing breakpoints with `dtctl edit breakpoint ...`
+- updating breakpoints with `dtctl update breakpoint ...`
 - deleting breakpoints with `dtctl delete breakpoint ...`
 - viewing decoded snapshot output with `dtctl query ... -o snapshot`
 
@@ -31,21 +31,23 @@ The `dev-obs:breakpoints:set` scope is supported via `dtctl auth login`, but is 
 
 ## 1. Configure workspace filters
 
-Use `dtctl debug --filters` to target the runtime instances you want Live Debugger to apply to.
+Use `dtctl update breakpoint --filters` to target the runtime instances you want Live Debugger to apply to.
 
 ```bash
-dtctl debug --filters k8s.namespace.name=prod
+dtctl update breakpoint --filters k8s.namespace.name:prod
 ```
 
-Multiple filters are supported as comma-separated `key=value` pairs:
+Multiple filters are supported as comma-separated `key:value` pairs.
+`key=value` is also supported for compatibility.
 
 ```bash
-dtctl debug --filters k8s.namespace.name=prod,dt.entity.host=HOST-123
+dtctl update breakpoints --filters k8s.namespace.name:prod,dt.entity.host:HOST-123
+dtctl update breakpoint --filters k8s.namespace.name=prod,dt.entity.host=HOST-123
 ```
 
 ### Notes
 
-- `--filters` is required for `dtctl debug`
+- `--filters` is required for `dtctl update breakpoint`
 - filter values are mapped to the Live Debugger workspace filter set payload
 - repeated keys are supported
 - in verbose/debug mode, raw GraphQL responses are printed for troubleshooting
@@ -120,19 +122,19 @@ dtctl describe OrderController.java:306 -o json
 dtctl describe OrderController.java:306 -o yaml
 ```
 
-## 5. Edit breakpoints
+## 5. Update breakpoints
 
 Update a breakpoint condition:
 
 ```bash
-dtctl edit breakpoint OrderController.java:306 --condition "value>othervalue"
+dtctl update breakpoint OrderController.java:306 --condition "value>othervalue"
 ```
 
 Enable or disable a breakpoint:
 
 ```bash
-dtctl edit breakpoint OrderController.java:306 --enabled true
-dtctl edit breakpoint OrderController.java:306 --enabled false
+dtctl update breakpoint OrderController.java:306 --enabled true
+dtctl update breakpoint OrderController.java:306 --enabled false
 ```
 
 ### Notes
@@ -221,7 +223,7 @@ Live Debugger mutating commands follow `dtctl` safety conventions:
 
 ```bash
 # Target a workload
-dtctl debug --filters k8s.namespace.name=prod
+dtctl update breakpoint --filters k8s.namespace.name:prod
 
 # Create a breakpoint
 dtctl create breakpoint OrderController.java:306
@@ -233,10 +235,10 @@ dtctl get breakpoints
 dtctl describe OrderController.java:306
 
 # Update condition
-dtctl edit breakpoint OrderController.java:306 --condition "orderId != null"
+dtctl update breakpoint OrderController.java:306 --condition "orderId != null"
 
 # Disable the breakpoint
-dtctl edit breakpoint OrderController.java:306 --enabled false
+dtctl update breakpoint OrderController.java:306 --enabled false
 
 # View snapshots
 dtctl query "fetch application.snapshots | sort timestamp desc | limit 5" -o snapshot

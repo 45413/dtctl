@@ -63,7 +63,7 @@ Command alias system design:
 
 ### [../LIVE_DEBUGGER.md](../LIVE_DEBUGGER.md)
 User-facing Live Debugger workflow documentation:
-- **Workspace Filters** - Target runtimes with `dtctl debug --filters`
+- **Workspace Filters** - Target runtimes with `dtctl update breakpoint --filters`
 - **Breakpoint Lifecycle** - Create, get, describe, edit, and delete breakpoint commands
 - **Status Inspection** - Use `dtctl describe <id|filename:line>` to inspect rollout and errors
 - **Snapshot Viewing** - Use `dtctl query ... -o snapshot` for decoded snapshot output

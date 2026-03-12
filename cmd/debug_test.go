@@ -89,23 +89,30 @@ func TestParseFilters(t *testing.T) {
 	}{
 		{
 			name:  "single filter",
-			input: "k8s.namespace.name=prod",
+			input: "k8s.namespace.name:prod",
 			want: map[string][]string{
 				"k8s.namespace.name": {"prod"},
 			},
 		},
 		{
 			name:  "multiple filters and duplicate keys",
-			input: "k8s.namespace.name=prod, dt.entity.host=HOST-1,k8s.namespace.name=stage",
+			input: "k8s.namespace.name:prod, dt.entity.host:HOST-1,k8s.namespace.name:stage",
 			want: map[string][]string{
 				"k8s.namespace.name": {"prod", "stage"},
 				"dt.entity.host":     {"HOST-1"},
 			},
 		},
-		{name: "missing equals", input: "k8s.namespace.name", wantErr: true},
+		{
+			name:  "equals separator remains supported",
+			input: "k8s.namespace.name=prod",
+			want: map[string][]string{
+				"k8s.namespace.name": {"prod"},
+			},
+		},
+		{name: "missing separator", input: "k8s.namespace.name", wantErr: true},
 		{name: "empty input", input: "", wantErr: true},
-		{name: "empty key", input: "=prod", wantErr: true},
-		{name: "empty value", input: "k8s.namespace.name=", wantErr: true},
+		{name: "empty key", input: ":prod", wantErr: true},
+		{name: "empty value", input: "k8s.namespace.name:", wantErr: true},
 	}
 
 	for _, tt := range tests {
