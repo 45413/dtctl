@@ -704,6 +704,17 @@ hr {
 }
 
 @media (max-width: 480px) {
+  /* Override midnight's nav{display:none} at this breakpoint */
+  nav,
+  .site-header nav {
+    display: flex !important;
+  }
+
+  section,
+  section#main_content {
+    margin-top: 0 !important;
+  }
+
   .hero h1 {
     font-size: 2rem !important;
   }
