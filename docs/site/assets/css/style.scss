@@ -45,7 +45,7 @@ body {
 /* Kill midnight's fixed header entirely */
 #header { display: none !important; }
 
-/* Override midnight's content wrapper */
+/* Override midnight's content wrapper and section constraints */
 #main_content_wrap.outer {
   background: none !important;
   border: none !important;
@@ -53,10 +53,12 @@ body {
   padding: 0 !important;
 }
 
+section,
+section#main_content,
 #main_content.inner {
   max-width: var(--dt-max-width) !important;
   margin: 0 auto !important;
-  padding: 0 2rem !important;
+  padding: 1rem 2rem 3rem !important;
   position: relative;
 }
 
