@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-03-20
+
+### Added
+- **Workflow task result retrieval** — new `dtctl get wfe-task-result <execution-id> --task <name>` command retrieves the structured return value of a specific workflow task (e.g., the object returned by a JavaScript task's `default` export function); previously this data was only accessible through the raw REST API
+- **`exec workflow --show-results`** — new `--show-results` flag for `dtctl exec workflow --wait` prints each task's structured return value after the execution completes, removing the need for separate `get wfe-task-result` calls per task; in agent mode, task results are included in the JSON envelope
+- **Environment URL confusion detection** — dtctl now detects common URL misconfiguration (e.g., `live.dynatrace.com` instead of `apps.dynatrace.com`, bare `dynatrace.com`, or missing `.apps.` on internal domains) and prints corrective suggestions; surfaces in `dtctl doctor` as a dedicated check, as warnings during `auth login` and `ctx set`, and as hints on 401/403/connection errors
+- **Junie agent support** — `dtctl skills install --for junie` installs skill files for the Junie IDE agent; includes auto-detection via `JUNIE` env var and both project-local (`.junie/skills/dtctl/`) and global (`~/.junie/skills/dtctl/`) install paths
+
 ### Changed
-- **Skills: migrate to agentskills.io standard** — `dtctl skills install` now copies the full skill directory (`SKILL.md` + `references/`) using the [agentskills.io](https://agentskills.io) open standard path (`<client>/skills/dtctl/`) instead of agent-specific file formats; YAML frontmatter and relative links are preserved verbatim; added Junie agent support and global install paths for Copilot, Junie, and OpenCode
+- **Skills: migrate to agentskills.io standard** — `dtctl skills install` now copies the full skill directory (`SKILL.md` + `references/`) using the [agentskills.io](https://agentskills.io) open standard path (`<client>/skills/dtctl/`) instead of agent-specific file formats; YAML frontmatter and relative links are preserved verbatim; existing installations should run `dtctl skills uninstall && dtctl skills install` to migrate
+- **Default `--chunk-size` changed from 500 to 0** — list commands now return only the first page of results by default (matching kubectl behavior); this fixes a performance regression where environments with many documents made 200+ sequential API requests taking 4+ minutes; users who need all results should pass `--chunk-size 500` explicitly
+- **Global skill installs for more agents** — `dtctl skills install --global` now supports Copilot (`~/.copilot/skills/dtctl/`), OpenCode (`~/.config/opencode/skills/dtctl/`), and Junie (`~/.junie/skills/dtctl/`) in addition to previously supported agents
+
+### Fixed
+- **Slow pagination on large environments** — the Document API ignores the `page-size` parameter and always returns ~20 items per page; after the pagination fix in v0.18.0, this caused list commands to issue hundreds of sequential requests; resolved by defaulting `--chunk-size` to 0
+- **Embedded skill files with CRLF on Windows** — added `.gitattributes` rules to force LF line endings for embedded skill files, fixing frontmatter detection failures (`"---\n"` prefix check) when building on Windows with `autocrlf=true`
 
 ## [0.18.0] - 2026-03-18
 
