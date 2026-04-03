@@ -83,4 +83,5 @@ dtctl exec copilot nl2dql "error logs from last hour"
 ## What's Next?
 
 - [Configuration]({{ '/docs/configuration/' | relative_url }}) -- multiple environments, safety levels, aliases
+- [AI Agent Skills]({{ '/docs/skills/' | relative_url }}) -- teach your AI coding agent how to use dtctl and Dynatrace
 - Individual resource guides for workflows, dashboards, DQL, SLOs, and more
