@@ -294,7 +294,7 @@ func TestFilterToAST_Parentheses(t *testing.T) {
 }
 
 func TestFilterToAST_AllOperators(t *testing.T) {
-	operators := []string{"=", "!=", "<", "<=", ">", ">="}
+	operators := []string{"=", "!=", "<", "<=", ">", ">=", "in"}
 	for _, op := range operators {
 		t.Run(op, func(t *testing.T) {
 			input := "key " + op + ` "value"`
@@ -331,6 +331,32 @@ func TestFilterToAST_NotInOperator(t *testing.T) {
 	json.Unmarshal(stmt.Operator, &op)
 	if op.Value != "not in" {
 		t.Errorf("expected operator 'not in', got %q", op.Value)
+	}
+}
+
+func TestFilterToAST_InOperator(t *testing.T) {
+	ast, err := FilterToAST(`status in "active"`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var root astGroupJSON
+	json.Unmarshal([]byte(ast), &root)
+	var stmt astStatementJSON
+	json.Unmarshal(root.Children[0], &stmt)
+	var op astLeafJSON
+	json.Unmarshal(stmt.Operator, &op)
+	if op.Value != "in" {
+		t.Errorf("expected operator 'in', got %q", op.Value)
+	}
+
+	// Verify round-trip: AST → DQL should produce original DQL
+	dql, err := FilterFromAST(ast)
+	if err != nil {
+		t.Fatalf("FilterFromAST error: %v", err)
+	}
+	if dql != `status in "active"` {
+		t.Errorf("round-trip failed, got %q", dql)
 	}
 }
 

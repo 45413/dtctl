@@ -371,7 +371,7 @@ The Dynatrace Filter Segments API requires the `filter` field in segment include
 - **Auto-detection**: A filter starting with `{` is treated as AST; plain DQL never starts with `{`.
 
 **Supported DQL syntax** (for the FilterField grammar):
-- Comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `not in`
+- Comparison operators: `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `not in`
 - Logical operators: `AND` (explicit or implicit via whitespace), `OR`
 - Parenthesized groups: `(a = "1" OR b = "2") AND c = "3"`
 - Quoted and unquoted values, backtick-escaped keys

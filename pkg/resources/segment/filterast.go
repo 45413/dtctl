@@ -490,10 +490,10 @@ func (p *parser) parseOperator() (*leafNode, error) {
 	remaining := p.input[p.pos:]
 
 	// Check operators from longest to shortest to avoid prefix conflicts
-	for _, op := range []string{"not in", "!=", "<=", ">=", "<", ">", "="} {
+	for _, op := range []string{"not in", "!=", "<=", ">=", "<", ">", "=", "in"} {
 		if strings.HasPrefix(remaining, op) {
-			// "not in" requires whitespace or end after it
-			if op == "not in" {
+			// "not in" and "in" require whitespace or end after them
+			if op == "not in" || op == "in" {
 				afterOp := p.pos + len(op)
 				if afterOp < len(p.input) && !isSpace(p.input[afterOp]) {
 					continue
