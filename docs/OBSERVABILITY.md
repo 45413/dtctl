@@ -2,7 +2,7 @@
 
 ## Distributed Tracing (W3C Trace Context)
 
-dtctl uses the [OpenTelemetry](https://opentelemetry.io/) SDK to create and export traces. Because OneAgent does not reliably instrument short-lived processes, dtctl exports spans directly via OTLP before the process exits. W3C Trace Context headers (`traceparent` / `tracestate`) are propagated on every HTTP request to Dynatrace APIs, so CLI invocations can participate in existing distributed traces.
+dtctl uses the [OpenTelemetry](https://opentelemetry.io/) SDK to create and export traces. dtctl exports spans directly via OTLP before the process exits. W3C Trace Context headers (`traceparent` / `tracestate`) are propagated on every HTTP request to Dynatrace APIs, so CLI invocations can participate in existing distributed traces.
 
 ### How it works
 
