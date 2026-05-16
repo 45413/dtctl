@@ -37,6 +37,7 @@ Thin, typed Go clients for Dynatrace REST APIs. Each package covers one API surf
 | `api/iam` | Account-level IAM (groups, users, policies, service users) |
 | `api/livedebugger` | Live debugger sessions |
 | `api/notification` | Notification/alerting configuration |
+| `api/query` | DQL query execution |
 | `api/segment` | Data segments |
 | `api/settings` | Settings 2.0 objects |
 | `api/slo` | Service Level Objectives |
